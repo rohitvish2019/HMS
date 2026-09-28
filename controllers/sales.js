@@ -1,0 +1,813 @@
+const ServicesData = require('../models/servicesAndCharges');
+const SalesData = require('../models/sales')
+const PatientData = require('../models/patients');
+const Tracker = require('../models/tracker');
+const Visits = require('../models/visits');
+const Sale = require('../models/sales');
+const hospitalConfig = require('../configs/hospitalConfig');
+const PharmacyMedicine = require('../models/pharmacyMedicines');
+
+function getDefaultDoctorForSaleType(type, doctorName){
+    if(type == 'Pathology' || type == 'DischargeBill' || type == 'IPDAdvance' || type == 'Ultrasound'){
+        return hospitalConfig.getHospitalConfig().doctors[0]?.name || doctorName;
+    } 
+    return doctorName;
+}
+
+module.exports.salesHistoryHome = function(req, res){
+    try{
+        return res.render('salesHistory',{user:req.user});
+    }catch(err){
+        return res.render('Error_500')
+    }
+    
+}
+
+module.exports.newPathologyBill = async function(req, res){
+    try{
+        let services = await ServicesData.find({}, 'Name');
+        return res.render('pathologyBill', {services, user:req.user})
+    }catch(err){
+        return res.render('Error_500')
+    }
+}
+
+module.exports.newOutsourcePathologyBill = async function(req, res){
+    try{
+        let services = await ServicesData.find({}, 'Name');
+        return res.render('outsourcePathologyBill', {services, user:req.user})
+    }catch(err){
+        return res.render('Error_500')
+    }
+}
+
+module.exports.newUltrasoundBill = async function(req, res){
+    try{
+        let services = await ServicesData.find({Type:'Ultrasound'}, 'Name');
+        return res.render('ultrasoundBilling', {services, user:req.user})
+    }catch(err){
+        return res.render('Error_500')
+    }
+}
+
+module.exports.newOtherBill = async function(req, res){
+    try{
+        let services = await ServicesData.find({}, 'Name');
+        return res.render('otherBills', {services, user:req.user})
+    }catch(err){
+        return res.render('Error_500')
+    }
+}
+
+module.exports.addSales = async function(req, res){
+    //Items should be an array and each value of array will be in below format
+    //ItemName$Quantity$Price$Notes
+    try{
+        let Name, Age, Address, Mobile, Id, Gender, Patient, IdProof,Husband
+        if(req.body.id){
+            console.log('Getting by id')
+            let patient = await PatientData.findOne({Id:req.body.id});
+            if(!patient || patient == null){
+                return res.status(400).json({
+                    message:'Invalid patient details'
+                })
+            }
+            Name = patient.Name,
+            Age = patient.Age,
+            Address = patient.Address,
+            Mobile = patient.Mobile,
+            Id = patient.Id
+            Gender = patient.Gender
+            Patient = patient._id,
+            IdProof = patient.IdProof,
+            Husband = patient.Husband
+        }else{
+            Name = req.body.patient.Name,
+            Age = req.body.patient.Age,
+            Address = req.body.patient.Address,
+            Mobile = req.body.patient.Mobile,
+            Gender = req.body.patient.Gender,
+            IdProof = req.body.patient.IdProof,
+            Husband = req.body.patient.Husband
+            Id = null,
+            Patient = null
+        }
+
+        const pharmacyDeductions = [];
+        if(req.body.Type == 'Pharmacy'){
+            const requestedStock = new Map();
+            for(const item of (req.body.PharmacyItems || [])){
+                const quantity = Number(item.quantity);
+                if(!item.medicineId || !Number.isInteger(quantity) || quantity < 1){
+                    return res.status(400).json({message:'Invalid pharmacy stock item'});
+                }
+                requestedStock.set(item.medicineId, (requestedStock.get(item.medicineId) || 0) + quantity);
+            }
+            if(!requestedStock.size){
+                return res.status(400).json({message:'No pharmacy stock items provided'});
+            }
+            for(const [medicineId, quantity] of requestedStock){
+                const updatedMedicine = await PharmacyMedicine.findOneAndUpdate(
+                    {_id: medicineId, isActive: true, isCancelled: false, quantity: {$gte: quantity}},
+                    {$inc: {quantity: -quantity}},
+                    {new: true}
+                );
+                if(!updatedMedicine){
+                    for(const deduction of pharmacyDeductions){
+                        await PharmacyMedicine.updateOne({_id: deduction.medicineId}, {$inc: {quantity: deduction.quantity}});
+                    }
+                    return res.status(400).json({message:'Insufficient stock for one or more medicines'});
+                }
+                pharmacyDeductions.push({medicineId, quantity});
+            }
+        }
+
+        let tracker = await Tracker.findOne({});
+        
+        let day = new Date().getDate().toString().padStart(2,'0')
+        let month = +new Date().getMonth()
+        let year = new Date().getFullYear()
+        let date = year +'-'+ (month+1).toString().padStart(2,'0') +'-'+ day; 
+        let rptType = 'NA'
+        let BillNo
+        if(req.body.Type == 'Ultrasound'){
+            rptType = 'USG'
+            BillNo = tracker.USGBillNumber + 1
+            await tracker.updateOne({USGBillNumber:BillNo});
+        }else if(req.body.Type == 'Pathology'){
+            rptType = 'PATH'
+            BillNo = tracker.PathologyBillNo + 1
+            await tracker.updateOne({PathologyBillNo:BillNo});
+        }else if(req.body.Type == 'Pathology_ots'){
+            rptType = 'OTS'
+            BillNo = (tracker.OutsourcePathologyBillNo || 0) + 1
+            await tracker.updateOne({OutsourcePathologyBillNo:BillNo});
+        }else if(req.body.Type == 'Other'){
+            rptType = 'DC'
+            BillNo = tracker.OtherBillNumber + 1
+            await tracker.updateOne({OtherBillNumber:BillNo});
+        }else if(req.body.Type == 'Pharmacy'){
+            rptType = 'PH'
+            BillNo = (tracker.PharmaBilNumber || 0) + 1
+            await tracker.updateOne({PharmaBilNumber:BillNo});
+        }
+        let sale;
+        try {
+            sale = await SalesData.create({
+            Patient:Id,
+            Name:Name,
+            Age:Age,
+            Mobile:Mobile,
+            Gender:Gender,
+            Husband:Husband,
+            Address:Address,
+            PatiendID:Id,
+            type:req.body.Type,
+            ReportNo:rptType+BillNo,
+            Patient:Patient,
+            UserName:req.user.Name,
+            User:req.user._id,
+            BillDate:date,
+            Total:req.body.Total,
+            Items:req.body.Items,
+            PharmacyItems:req.body.Type == 'Pharmacy' ? req.body.PharmacyItems : undefined,
+            PaymentType:req.body.paymentMode,
+            IdProof :IdProof,
+            Doctor:getDefaultDoctorForSaleType(req.body.Type, req.body.patient.Doctor),
+            OnlinePaid:req.body.onlinePayment,
+            CashPaid:req.body.cashPayment,
+            ReferredBy: req.body.patient && req.body.patient.ReferredBy ? req.body.patient.ReferredBy : ''
+            });
+        } catch(err) {
+            for(const deduction of pharmacyDeductions){
+                await PharmacyMedicine.updateOne({_id: deduction.medicineId}, {$inc: {quantity: deduction.quantity}});
+            }
+            throw err;
+        }
+        
+    return res.status(200).json({
+        message:'Bill created successfully',
+        Bill_id : sale._id
+    })
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({
+            message:'Internal Server Error : Unable to add new bill'
+        })
+    }
+}
+
+
+module.exports.getBillById = async function(req, res){
+    let bill 
+    try{
+        console.log(req.params.id);
+        bill = await SalesData.findOne({_id:req.params.id});
+        
+        if(bill && req.xhr){
+            return res.status(200).json({
+                bill
+            })
+        }else if(bill && !req.xhr){
+            return res.render('billTemplate',{bill, user:req.user})
+        }
+        else if(req.xhr && (!bill || bill == null)){
+            return res.status(404).json({
+                message:'No bill found'
+            })
+        }
+        else{
+            return res.render('Error_404')
+        } 
+    }catch(err){
+        console.log(err)
+        return res.render('Error_500')
+    }
+}
+
+
+
+module.exports.getBillsByDate = async function(req, res){
+    try{
+        //date to be fixed to handle all date formats
+        let BillType = req.query.BillType;
+        let date = req.query.selectedDate;
+        let Doctor = req.query.Doctor;
+        let doctorRegEx = 'other'
+        if(containsIgnoreCase(req.query.Doctor, "anuj")){
+            doctorRegEx = 'anuj'
+        } else if (containsIgnoreCase(req.query.Doctor, "swati") ){
+            doctorRegEx = 'swati'
+        }
+        let billsList;
+        if(BillType == 'all'){
+            if(Doctor == 'all'){
+                billsList = await SalesData.find({BillDate:date,isCancelled:false, isValid:true});
+            }else{
+                billsList = await SalesData.find({BillDate:date,isCancelled:false, isValid:true, Doctor: { $regex: doctorRegEx, $options:'i'}});
+            }
+            
+        }else{
+            if(Doctor == 'all'){
+                billsList = await SalesData.find({BillDate:date,type:req.query.BillType, isCancelled:false, isValid:true});
+            }else{
+                billsList = await SalesData.find({BillDate:date,type:req.query.BillType, isCancelled:false, isValid:true, Doctor: { $regex: doctorRegEx, $options:'i'}});
+            }
+            
+        }
+        return res.status(200).json({
+            message:'Bills fetched',
+            billsList
+        })
+       
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({
+            message:'Internal Server Error : unable to find bills on specific date'
+        })
+    }
+}
+
+
+function containsIgnoreCase(string, substring) {
+    console.log(string," : "+ substring);
+  if (typeof string !== 'string' || typeof substring !== 'string') {
+    console.log("here me failing")
+    return false;
+  }
+  return string.toLowerCase().includes(substring.toLowerCase());
+}
+/*
+function addOneDay(date) {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+        throw new Error("Input must be a valid Date object.");
+    }
+
+    // Create a new Date object to avoid modifying the original
+    const newDate = new Date(date);
+    
+    // Add one day
+    newDate.setDate(newDate.getDate() + 1);
+
+    // Check if the date is still within JavaScript's supported range
+    if (Math.abs(newDate.getTime()) > 8.64e15) {
+        throw new Error("Resulting date is out of range for JavaScript Date object.");
+    }
+
+    return newDate;
+}
+*/
+
+module.exports.getBillsByDateRange = async function(req, res){
+    try{
+        let BillType = req.query.BillType;
+        let Doctor = req.query.Doctor;
+        let billsList;
+        if(BillType == 'all'){
+            if(Doctor == 'all'){
+                billsList = await SalesData.find({
+                    $and: [
+                        {BillDate:{$gte :req.query.startDate}},
+                        {BillDate: {$lte : req.query.endDate}},
+                        {isCancelled:false, isValid:true}
+                    ]
+                })
+            }else{
+                billsList = await SalesData.find({
+                    $and: [
+                        {BillDate:{$gte :req.query.startDate}},
+                        {BillDate: {$lte : req.query.endDate}},
+                        {isCancelled:false, isValid:true, Doctor:req.query.Doctor}
+                    ]
+                })
+            }
+            
+        }else{
+            if(Doctor == 'all'){
+                billsList = await SalesData.find({
+                    $and: [
+                        {BillDate:{$gte :req.query.startDate}},
+                        {BillDate: {$lte : req.query.endDate}},
+                        {type:req.query.BillType,isCancelled:false, isValid:true}
+                    ]
+                })
+            }else{
+                billsList = await SalesData.find({
+                    $and: [
+                        {BillDate:{$gte :req.query.startDate}},
+                        {BillDate: {$lte : req.query.endDate}},
+                        {type:req.query.BillType,isCancelled:false, isValid:true, Doctor:req.query.Doctor}
+                    ]
+                })
+            }
+            
+        }
+        
+        return res.status(200).json({
+            message:'Bills fetched',
+            billsList
+        })
+        
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({
+            message:'Internal Server Error : unable to find bills on specific dates'
+        })
+    }
+}
+
+
+module.exports.cancelSale = async function(req, res){
+    try{
+        if(req.user.Role == 'Admin' || req.user.Role == 'Doctor'){
+            const sale = await cancelSaleById(req.body.saleId);
+            return res.status(200).json({
+                message:'Sales cancelled',
+                saleId:sale._id
+            })
+        }else{
+            return res.status(403).json({
+                message:'Unauthorized action'
+            })
+        }
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({
+            message:'Error cancelling sales'
+        })
+    }
+}
+
+async function cancelSaleById(saleId){
+    const sale = await SalesData.findById(saleId);
+    if(!sale){
+        const error = new Error('Sale not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    if(sale.isCancelled){
+        return sale;
+    }
+    let appointment = await Visits.findOne({SaleId:sale._id},'isCancelled VisitData');
+    if(appointment && appointment.VisitData && appointment.VisitData.complaint && appointment.VisitData.complaint.length > 0){
+        const error = new Error('Appointment already completed');
+        error.statusCode = 424;
+        throw error;
+    }
+    if(sale.type == 'IPDAdvance'){
+        let pattern = sale.Total + "\\$" + sale.BillDate;
+        await Visits.findByIdAndUpdate(sale.Visit, {$pull : { advancedPayments : { $regex : pattern}}});
+    }
+    await sale.updateOne({isCancelled:true})
+    if(appointment){
+        await appointment.updateOne({isCancelled:true})
+    }
+    return sale;
+}
+
+module.exports.bulkCancelSale = async function(req, res){
+    try{
+        if(req.user.Role != 'Admin' && req.user.Role != 'Doctor'){
+            return res.status(403).json({
+                message:'Unauthorized action'
+            })
+        }
+        let saleIds = req.body.saleIds || [];
+        if(typeof saleIds == 'string'){
+            saleIds = [saleIds];
+        }
+        saleIds = [...new Set(saleIds.filter(id => id && id.length > 0))];
+        if(saleIds.length < 1){
+            return res.status(400).json({
+                message:'No sales selected'
+            })
+        }
+
+        const cancelledSaleIds = [];
+        const failedSales = [];
+        for(let i=0;i<saleIds.length;i++){
+            try{
+                const sale = await cancelSaleById(saleIds[i]);
+                cancelledSaleIds.push(sale._id.toString());
+            }catch(err){
+                failedSales.push({
+                    saleId:saleIds[i],
+                    message:err.message || 'Unable to cancel sale'
+                })
+            }
+        }
+
+        return res.status(200).json({
+            message:'Bulk cancel completed',
+            cancelledSaleIds,
+            failedSales
+        })
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({
+            message:'Error cancelling sales'
+        })
+    }
+}
+
+
+module.exports.validateBill = async function(req , res){
+    try{
+        let bill = await SalesData.findOne({ReportNo:req.query.billNumber, Name:req.query.Name, isValid:true, isCancelled:false});
+        console.log(bill)
+        if(bill){
+            return res.status(200).json({
+                isValid : true
+            })
+        }else{
+            return res.status(200).json({
+                isValid :false
+            })
+        }
+    }catch(err){
+        return res.status(500).json({
+            message:'Unable to validate bill'
+        })
+    }
+}
+
+module.exports.changePaymentMethod = async function(req, res){
+    try{
+        if(req.body.newPaymentMethod == 'Cash'){
+            await SalesData.findByIdAndUpdate(req.body.id, {$set : {OnlinePaid:0, CashPaid : req.body.Total, PaymentType:'Cash'} } )
+        } else {
+            await SalesData.findByIdAndUpdate(req.body.id, {$set : {OnlinePaid : req.body.Total, CashPaid : 0, PaymentType:'Online'} } )
+        }
+        return res.status(200).json({
+            message : 'Updated payment method'
+        })
+    }catch(err){
+        console.log(err);
+        return res.status(500).json({
+            message :'Error updating payment method'
+        })
+    }
+}
+
+module.exports.reportsHome = function(req, res) {
+    try{
+        return res.render('reports')
+    }catch(err){
+        return res.render("Error_500")
+    }
+}
+
+
+module.exports.getReportsRange = async function(req, res) {
+    try{
+
+        let BillType = req.query.BillType;
+        let Doctor = req.query.Doctor;
+        let billsList;
+        const startDate = req.query.startDate;
+        const endDate = req.query.endDate;
+
+        if(BillType == 'all'){
+            if(Doctor == 'all'){
+                billsList =  await Sale.aggregate([
+                {
+                    $match: {
+                    isValid: true,
+                    isCancelled: false,
+                    BillDate: { $gte: startDate, $lte: endDate }
+                    }
+                },
+                {
+                    $group: {
+                    _id: {
+                        date: "$BillDate",
+                        type: {
+                        $cond: [
+                            { $or: [{ $eq: ["$type", null] }, { $eq: ["$type", ""] }] },
+                            "Unknown",
+                            "$type"
+                        ]
+                        }
+                    },
+                    total: { $sum: "$Total" }
+                    }
+                },
+                {
+                    $group: {
+                    _id: "$_id.date",
+                    types: {
+                        $push: {
+                        k: {
+                            $replaceAll: {
+                            input: "$_id.type",
+                            find: " ",
+                            replacement: "_"
+                            }
+                        },
+                        v: "$total"
+                        }
+                    }
+                    }
+                },
+                {
+                    $project: {
+                    _id: 0,
+                    date: "$_id",
+                    feeSummary: {
+                        $arrayToObject: "$types"
+                    }
+                    }
+                },
+                {
+                    $replaceRoot: {
+                    newRoot: {
+                        $mergeObjects: [
+                        { date: "$date" },
+                        "$feeSummary"
+                        ]
+                    }
+                    }
+                },
+                {
+                    $sort: { date: 1 }
+                }
+                ]);
+            }else{
+                billsList = await Sale.aggregate([
+                {
+                    $match: {
+                    isValid: true,
+                    isCancelled: false,
+                    Doctor:Doctor,
+                    BillDate: { $gte: startDate, $lte: endDate }
+                    }
+                },
+                {
+                    $group: {
+                    _id: {
+                        date: "$BillDate",
+                        type: {
+                        $cond: [
+                            { $or: [{ $eq: ["$type", null] }, { $eq: ["$type", ""] }] },
+                            "Unknown",
+                            "$type"
+                        ]
+                        }
+                    },
+                    total: { $sum: "$Total" }
+                    }
+                },
+                {
+                    $group: {
+                    _id: "$_id.date",
+                    types: {
+                        $push: {
+                        k: {
+                            $replaceAll: {
+                            input: "$_id.type",
+                            find: " ",
+                            replacement: "_"
+                            }
+                        },
+                        v: "$total"
+                        }
+                    }
+                    }
+                },
+                {
+                    $project: {
+                    _id: 0,
+                    date: "$_id",
+                    feeSummary: {
+                        $arrayToObject: "$types"
+                    }
+                    }
+                },
+                {
+                    $replaceRoot: {
+                    newRoot: {
+                        $mergeObjects: [
+                        { date: "$date" },
+                        "$feeSummary"
+                        ]
+                    }
+                    }
+                },
+                {
+                    $sort: { date: 1 }
+                }
+                ]);
+            }
+            
+        }else{
+            
+            if(Doctor == 'all'){
+                billsList = await Sale.aggregate([
+                {
+                    $match: {
+                    isValid: true,
+                    isCancelled: false,
+                    type:BillType,
+                    BillDate: { $gte: startDate, $lte: endDate }
+                    }
+                },
+                {
+                    $group: {
+                    _id: {
+                        date: "$BillDate",
+                        type: {
+                        $cond: [
+                            { $or: [{ $eq: ["$type", null] }, { $eq: ["$type", ""] }] },
+                            "Unknown",
+                            "$type"
+                        ]
+                        }
+                    },
+                    total: { $sum: "$Total" }
+                    }
+                },
+                {
+                    $group: {
+                    _id: "$_id.date",
+                    types: {
+                        $push: {
+                        k: {
+                            $replaceAll: {
+                            input: "$_id.type",
+                            find: " ",
+                            replacement: "_"
+                            }
+                        },
+                        v: "$total"
+                        }
+                    }
+                    }
+                },
+                {
+                    $project: {
+                    _id: 0,
+                    date: "$_id",
+                    feeSummary: {
+                        $arrayToObject: "$types"
+                    }
+                    }
+                },
+                {
+                    $replaceRoot: {
+                    newRoot: {
+                        $mergeObjects: [
+                        { date: "$date" },
+                        "$feeSummary"
+                        ]
+                    }
+                    }
+                },
+                {
+                    $sort: { date: 1 }
+                }
+                ]);
+            }else{
+                billsList = await Sale.aggregate([
+                {
+                    $match: {
+                    isValid: true,
+                    isCancelled: false,
+                    Doctor:Doctor,
+                    type:BillType,
+                    BillDate: { $gte: startDate, $lte: endDate }
+                    }
+                },
+                {
+                    $group: {
+                    _id: {
+                        date: "$BillDate",
+                        type: {
+                        $cond: [
+                            { $or: [{ $eq: ["$type", null] }, { $eq: ["$type", ""] }] },
+                            "Unknown",
+                            "$type"
+                        ]
+                        }
+                    },
+                    total: { $sum: "$Total" }
+                    }
+                },
+                {
+                    $group: {
+                    _id: "$_id.date",
+                    types: {
+                        $push: {
+                        k: {
+                            $replaceAll: {
+                            input: "$_id.type",
+                            find: " ",
+                            replacement: "_"
+                            }
+                        },
+                        v: "$total"
+                        }
+                    }
+                    }
+                },
+                {
+                    $project: {
+                    _id: 0,
+                    date: "$_id",
+                    feeSummary: {
+                        $arrayToObject: "$types"
+                    }
+                    }
+                },
+                {
+                    $replaceRoot: {
+                    newRoot: {
+                        $mergeObjects: [
+                        { date: "$date" },
+                        "$feeSummary"
+                        ]
+                    }
+                    }
+                },
+                {
+                    $sort: { date: 1 }
+                }
+                ]);
+            }
+            
+        }
+        
+        return res.status(200).json({
+            message:'Bills fetched',
+            billsList
+        })
+        
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({
+            message:'Internal Server Error : unable to find bills on specific dates'
+        })
+    }
+}
+
+
+module.exports.getBillsByPatId = async function(req, res) {
+    try {
+        console.log(req.query)
+        let billsList = await SalesData.find({
+                    $and: [
+                        {BillDate:{$gte :req.query.startDate}},
+                        {BillDate: {$lte : req.query.endDate}},
+                        {PatiendID:req.query.patId},
+                        {isCancelled:false, isValid:true}
+                    ]
+                })
+        return res.status(200).json({
+            billsList
+        })
+    } catch(err) {
+        console.log(err)
+        return res.status(500).json({
+            message:'Unable to fetch Bills'
+        })
+    }
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales History</title>
+<script src="/js/vendor/noty-3.1.4.min.js"></script>
+<link rel="stylesheet" href="/css/vendor/noty-3.1.4.min.css" />
+<script src="/js/vendor/jquery.min.js"></script>
+
+<link rel="stylesheet" href="/css/purchasesHistory.css">
+</head>
+<body>
+    <header id="header">
+        <%-include('_header')%>
+    </header>
+    <div class="main-body" id="main-body">
+        <div class="heading">
+            <h2>Agregate Sales Reports</h2>
+        </div>
+        <div class="searchElements" style="display: flex; justify-content:flex-start; align-items: center; gap: 10px; margin-top: 1%; flex-wrap: wrap;">
+                <div id="dateRangeInputs" style="margin-right: 1%; display: flex; align-items: center; gap: 6px;">
+                    <label for=""><b>Date Range : </b>&nbsp;</label>
+                    <input type="date" name="" id="startDate">
+                    <input type="date" name="" id="endDate">
+                </div>
+                <div style="margin-right: 1%;">
+                    <select name="" id="billType" style="height: 36px; min-height: 36px; padding: 5px 6px; font-size: 13px;">
+                        <option value="all">All Sales</option>
+                        <option value="Appointment">Appointment Fees</option>
+                        <option value="Pathology"> Pathology Bill</option>
+                        <option value="Pathology_ots">Outsource Pathology Billing</option>
+                        <option value="DischargeBill">Discharge Bills</option>
+                        <option value="Ultrasound">Ultrasound Bills</option>
+                        <option value="IPDAdvance">IPD Advance payment</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <select name="" id="Doctor" style="height: 36px; min-height: 36px; padding: 5px 6px; font-size: 13px;">
+                        <option value="">--Select Doctor--</option>
+                        <option value="all" selected>All Doctors</option>
+                        <% for (let i = 0; i < hospitalConfig.doctors.length; i++) { %>
+                            <option value="<%= hospitalConfig.doctors[i].name %>"><%= hospitalConfig.doctors[i].name %></option>
+                        <% } %>
+                    </select>
+                </div>
+                <button style="height: 36px; min-height: 36px; margin: 0; padding: 6px 14px; font-size: 11px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);" class="btn btn-success" onclick="getSalesHistory()">Search</button>
+                <div style="display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 12px; background: #e4e7eb; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); margin-left: 2px;">
+                    <b id="tvalue" style="display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 5px 10px; font-size: 11px; font-weight: 600; border-radius: 999px; background: rgba(0, 123, 255, 0.12); color: #004085; border: 1px solid rgba(0, 123, 255, 0.3); margin: 0;">Total : ₹ 0</b>
+                    <b id="doctorName" style="display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 5px 10px; font-size: 11px; font-weight: 600; border-radius: 999px; background: rgba(108, 117, 125, 0.12); color: #495057; border: 1px solid rgba(108, 117, 125, 0.25); margin: 0;">Doctor : All</b>
+                </div>
+                <button style="height: 36px; min-height: 36px; margin: 0; padding: 6px 14px; font-size: 11px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);" class="btn btn-primary" onclick="printMe()">Print</button>
+        </div>
+        <div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforAppointmentFee" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforAppointmentFee">Appointment Fees</label>
+            </div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforPathology" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforAppointmentFee">Pathology</label>
+            </div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforOutsourcePathology" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforOutsourcePathology">Outsource Pathology</label>
+            </div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforDischargeBill" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforDischargeBill">Discharge Bills</label>
+            </div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforUltrasound" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforUltrasound">Ultrasound</label>
+            </div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforIPDAdvance" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforIPDAdvance">IPD Advance</label>
+            </div>
+            <div class="inline-div">
+                <input type="checkbox" id="checkBoxforOther" checked onchange="applySelectedColumns()">
+                <label for="checkBoxforOther">Other</label>
+            </div>
+            
+        </div>
+        <div class="table-body" style="overflow: auto;">
+            <table class="table table-striped table-bordered">
+                <thead style="position: relative; top: 0%;">
+                    <tr class="bg">
+                        <th>#</th>
+                        <th>Date</th>
+                        <th class="report-col report-col-Appointment">Appointment Fees</th>
+                        <th class="report-col report-col-Pathology">Pathology</th>
+                        <th class="report-col report-col-Pathology_ots">Outsource Pathology</th>
+                        <th class="report-col report-col-DischargeBill">Discharge Payment</th>
+                        <th class="report-col report-col-Ultrasound">Ultrasound</th>
+                        <th class="report-col report-col-IPDAdvance">IPD Advance</th>
+                        <th class="report-col report-col-Other">Other</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <%-include('_loader')%>
+                <tbody id="historyBody">
+                    <!-- Table rows will be populated dynamically -->
+                     
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+<script src="/js/salesReports.js"></script>
+</body>
+</html>

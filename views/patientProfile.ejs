@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Profile</title>
+    
+    <link rel="stylesheet" href="/css/vendor/fontawesome-5.15.4.min.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <style>
+        .heading {
+            padding: 10px;
+            background-color: #343a40 !important;
+            text-align: center;
+            color: white;
+            border: 2px solid white;
+            margin-bottom: 16px;
+        }
+        .profile-card {
+            width: 100%;
+            margin: 0;
+            padding: 24px;
+        }
+        .profile-actions {
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .profile-actions .btn {
+            min-width: 140px;
+            height: 40px;
+            margin-bottom: 1%;
+        }
+        .profile-form label {
+            font-weight: 600;
+        }
+        .profile-form .form-control {
+            border-radius: 6px;
+        }
+        .profile-actions {
+            justify-content: flex-end;
+        }
+        #profileTitle {
+            color: white;
+        }
+        .appointment-modal {
+            background: rgba(0, 0, 0, 0.5);
+            position: fixed;
+            inset: 0;
+            z-index: 1050;
+            overflow-y: auto;
+        }
+        .appointment-modal .modal-dialog {
+            margin: 8vh auto;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <%-include('_header')%>
+    </header>
+
+    <main class="container-fluid profile-card">
+        <div class="heading">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1"><i class="fas fa-user-circle"></i> <span id="profileTitle">Patient Profile</span></h2>
+                    <small id="profileSubtitle">Patient Address</small>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm w-100">
+            <div class="card-body" id="profileContent">
+                <div class="text-center py-5" id="profileLoading">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-3 mb-0">Loading patient profile...</p>
+                </div>
+                <div id="profileError" class="alert alert-danger d-none" role="alert"></div>
+                <div id="profileSuccess" class="alert alert-success d-none" role="alert"></div>
+                <form id="patientProfileForm" class="profile-form d-none">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <p class="mb-2"><strong>ID Proof:</strong> <span id="profileIdProofDisplay"></span></p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="inputName">Name</label>
+                            <input id="inputName" class="form-control" placeholder="Patient name">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="inputId">Patient Id</label>
+                            <input id="inputId" class="form-control" placeholder="Patient Id">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="inputAge">Age</label>
+                            <input id="inputAge" type="number" class="form-control" placeholder="Age">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="inputGender">Gender</label>
+                            <select id="inputGender" class="form-control">
+                                <option value="">Select gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="inputMobile">Mobile</label>
+                            <input id="inputMobile" class="form-control" placeholder="Mobile">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="inputDoctor">Doctor</label>
+                            <input id="inputDoctor" class="form-control" placeholder="Doctor">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="inputIdProof">ID Proof</label>
+                            <input id="inputIdProof" name="IdProof" type="text" class="form-control" placeholder="ID Proof">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="inputFather">Father</label>
+                            <input id="inputFather" class="form-control" placeholder="Father name">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="inputHusband">Husband</label>
+                            <input id="inputHusband" class="form-control" placeholder="Husband name">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="inputAddress">Address</label>
+                            <textarea id="inputAddress" class="form-control" rows="1" placeholder="Address"></textarea>
+                        </div>
+                    </div>
+                </form>
+                <div class="d-none profile-actions mt-3" id="profileButtons">
+                    <button id="bookAppointmentBtn" type="button" class="btn btn-primary">Book Appointment</button>
+                    <button id="savePatientBtn" type="button" class="btn btn-success">Save changes</button>
+                    <button id="refreshPatientBtn" type="button" class="btn btn-secondary">Refresh</button>
+                </div>
+                <div id="profileVisits" class="d-none mt-4">
+                    <div class="card mt-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">Visits</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped mb-0 visit-table">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Doctor</th>
+                                            <th>Fees</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="visitRows"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="appointmentModal" class="appointment-modal d-none" role="dialog" aria-modal="true" aria-labelledby="appointmentModalTitle">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="appointmentModalTitle" class="modal-title">Book Appointment</h5>
+                    <button id="closeAppointmentModalBtn" type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="appointmentDate">Appointment Date</label>
+                        <input id="appointmentDate" type="date" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="appointmentDoctor">Doctor</label>
+                        <select id="appointmentDoctor" class="form-control">
+                            <option value="">--Select Doctor--</option>
+                            <% for (let i = 0; i < hospitalConfig.doctors.length; i++) { %>
+                                <option value="<%= hospitalConfig.doctors[i].name %>"><%= hospitalConfig.doctors[i].name %></option>
+                            <% } %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="appointmentFees">Fees</label>
+                        <input id="appointmentFees" type="number" min="0" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input id="emergencyBooking" type="checkbox" class="form-check-input">
+                            <label for="emergencyBooking" class="form-check-label">Emergency Booking</label>
+                        </div>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="appointmentPaymentType">Payment Type</label>
+                        <select id="appointmentPaymentType" class="form-control">
+                            <option value="">--Select Payment Type--</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Online">Online</option>
+                            <option value="NA">NA</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelAppointmentBtn" type="button" class="btn btn-secondary">Cancel</button>
+                    <button id="confirmAppointmentBtn" type="button" class="btn btn-primary">Book Appointment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const patientId = '<%= patientId %>';
+        const detailUrl = `/patients/details/${patientId}`;
+        const updateUrl = `/patients/update/${patientId}`;
+        let currentPatient = null;
+
+        function showError(message) {
+            document.getElementById('profileLoading').classList.add('d-none');
+            const errorEl = document.getElementById('profileError');
+            errorEl.textContent = message;
+            errorEl.classList.remove('d-none');
+            document.getElementById('profileSuccess').classList.add('d-none');
+        }
+
+        function showSuccess(message) {
+            const successEl = document.getElementById('profileSuccess');
+            successEl.textContent = message;
+            successEl.classList.remove('d-none');
+            document.getElementById('profileError').classList.add('d-none');
+        }
+
+        function populateForm(patient) {
+            document.getElementById('inputName').value = patient.Name || '';
+            document.getElementById('inputId').value = patient.Id || '';
+            document.getElementById('inputAge').value = patient.Age || '';
+            document.getElementById('inputGender').value = patient.Gender || '';
+            document.getElementById('inputMobile').value = patient.Mobile || '';
+            document.getElementById('inputDoctor').value = patient.Doctor || '';
+            document.getElementById('inputIdProof').value = patient.IdProof || '';
+            document.getElementById('inputFather').value = patient.Father || '';
+            document.getElementById('inputHusband').value = patient.Husband || '';
+            document.getElementById('inputAddress').value = patient.Address || '';
+        }
+
+        function renderVisits(visits) {
+            const visitRows = document.getElementById('visitRows');
+            visitRows.innerHTML = '';
+            if (!visits || !visits.length) {
+                visitRows.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No visits found</td></tr>';
+                return;
+            }
+            visits.forEach(visit => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${visit.Visit_date || '-'}</td>
+                    <td>${visit.Type || '-'}</td>
+                    <td>${visit.Doctor || '-'}</td>
+                    <td>${visit.Fees != null ? visit.Fees : '-'}</td>
+                    <td>${visit.isCancelled ? 'Cancelled' : visit.isValid === false ? 'Invalid' : 'Active'}</td>`;
+                visitRows.appendChild(row);
+            });
+        }
+
+        function showProfile(patient) {
+            currentPatient = patient;
+            document.getElementById('profileTitle').textContent = `${patient.Name || 'Patient'} (${patient.Id || 'NA'})`;
+            document.getElementById('profileSubtitle').textContent = patient.Address || 'Address not provided';
+            populateForm(patient);
+            document.getElementById('profileIdProofDisplay').textContent = patient.IdProof || 'Not provided';
+            renderVisits(patient.Visits || []);
+            document.getElementById('profileLoading').classList.add('d-none');
+            document.getElementById('patientProfileForm').classList.remove('d-none');
+            document.getElementById('profileButtons').classList.remove('d-none');
+            document.getElementById('profileVisits').classList.remove('d-none');
+        }
+
+        function localDateString(date) {
+            const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+            return offsetDate.toISOString().slice(0, 10);
+        }
+
+        function getLatestVisitDate() {
+            if (!currentPatient || !currentPatient.Visits || !currentPatient.Visits.length) {
+                return null;
+            }
+            const dates = currentPatient.Visits
+                .map(visit => visit.createdAt || visit.Visit_date)
+                .filter(Boolean)
+                .map(value => new Date(value))
+                .filter(value => !Number.isNaN(value.getTime()));
+            if (!dates.length) {
+                return null;
+            }
+            return new Date(Math.max(...dates.map(value => value.getTime())));
+        }
+
+        function calculateAppointmentFees() {
+            const appointmentDate = document.getElementById('appointmentDate').value;
+            if (!appointmentDate) {
+                return;
+            }
+            const selectedDate = new Date(appointmentDate + 'T00:00:00');
+            const lastVisitDate = getLatestVisitDate();
+            let fees = 500;
+            if (lastVisitDate) {
+                const daysBetween = Math.floor((selectedDate - lastVisitDate) / (1000 * 60 * 60 * 24));
+                fees = daysBetween > 30 ? 500 : 300;
+            }
+            if (selectedDate.getDay() === 0) {
+                fees = 700;
+            }
+            if (document.getElementById('emergencyBooking').checked) {
+                fees = 700;
+            }
+            document.getElementById('appointmentFees').value = fees;
+        }
+
+        function openAppointmentModal() {
+            if (!currentPatient) {
+                showError('Patient details are still loading.');
+                return;
+            }
+            document.getElementById('appointmentDate').value = localDateString(new Date());
+            document.getElementById('appointmentDoctor').value = currentPatient.Doctor || '';
+            document.getElementById('appointmentPaymentType').value = '';
+            document.getElementById('emergencyBooking').checked = false;
+            calculateAppointmentFees();
+            document.getElementById('appointmentModal').classList.remove('d-none');
+        }
+
+        function closeAppointmentModal() {
+            document.getElementById('appointmentModal').classList.add('d-none');
+        }
+
+        function bookAppointment() {
+            const date = document.getElementById('appointmentDate').value;
+            const Doctor = document.getElementById('appointmentDoctor').value;
+            const Fees = document.getElementById('appointmentFees').value;
+            const paymentType = document.getElementById('appointmentPaymentType').value;
+            if (!date || !Doctor || !Fees || !paymentType) {
+                showError('Appointment date, doctor, fees, and payment type are mandatory.');
+                return;
+            }
+            const button = document.getElementById('confirmAppointmentBtn');
+            button.disabled = true;
+            const patient = {
+                Name: currentPatient.Name,
+                Age: currentPatient.Age,
+                Address: currentPatient.Address,
+                Mobile: currentPatient.Mobile,
+                Gender: currentPatient.Gender,
+                Husband: currentPatient.Husband,
+                Father: currentPatient.Father,
+                IdProof: currentPatient.IdProof,
+                Doctor,
+                AppointmentDate: date
+            };
+            fetch('/patients/visits/bookToday', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ PatientId: currentPatient.Id, date, Fees, patient, Doctor, paymentType, IdProof: currentPatient.IdProof || '' })
+            })
+                .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                .then(result => {
+                    if (!result.ok) {
+                        throw new Error(result.data.message || 'Unable to book appointment.');
+                    }
+                    closeAppointmentModal();
+                    showSuccess(result.data.message || 'Appointment booked successfully.');
+                    loadProfile();
+                    if (result.data.visit) {
+                        window.open('/sales/bill/view/' + result.data.visit);
+                    }
+                })
+                .catch(error => showError(error.message || 'Unable to book appointment.'))
+                .finally(() => {
+                    button.disabled = false;
+                });
+        }
+
+        function loadProfile() {
+            document.getElementById('profileLoading').classList.remove('d-none');
+            fetch(detailUrl, { credentials: 'same-origin' })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.patient) {
+                        showError(data.message || 'Patient record was not found.');
+                        return;
+                    }
+                    showProfile(data.patient);
+                })
+                .catch(() => {
+                    showError('Unable to fetch patient data.');
+                });
+        }
+
+        function sendUpdate() {
+            const payload = {
+                Name: document.getElementById('inputName').value.trim(),
+                Id: document.getElementById('inputId').value.trim(),
+                Age: document.getElementById('inputAge').value.trim(),
+                Gender: document.getElementById('inputGender').value,
+                Mobile: document.getElementById('inputMobile').value.trim(),
+                Doctor: document.getElementById('inputDoctor').value.trim(),
+                IdProof: document.getElementById('inputIdProof').value.trim(),
+                Father: document.getElementById('inputFather').value.trim(),
+                Husband: document.getElementById('inputHusband').value.trim(),
+                Address: document.getElementById('inputAddress').value.trim()
+            };
+            fetch(updateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            })
+                .then(response => response.json().then(data => ({ status: response.status, body: data })))
+                .then(result => {
+                    if (result.status === 200 && result.body.patient) {
+                        showSuccess(result.body.message || 'Patient updated successfully.');
+                        renderVisits(result.body.patient.Visits || []);
+                    } else {
+                        showError(result.body.message || 'Unable to update patient details.');
+                    }
+                })
+                .catch(() => {
+                    showError('Unable to update patient details.');
+                });
+        }
+
+        document.getElementById('savePatientBtn').addEventListener('click', sendUpdate);
+        document.getElementById('refreshPatientBtn').addEventListener('click', loadProfile);
+        document.getElementById('bookAppointmentBtn').addEventListener('click', openAppointmentModal);
+        document.getElementById('closeAppointmentModalBtn').addEventListener('click', closeAppointmentModal);
+        document.getElementById('cancelAppointmentBtn').addEventListener('click', closeAppointmentModal);
+        document.getElementById('appointmentDate').addEventListener('change', calculateAppointmentFees);
+        document.getElementById('emergencyBooking').addEventListener('change', calculateAppointmentFees);
+        document.getElementById('confirmAppointmentBtn').addEventListener('click', bookAppointment);
+        loadProfile();
+    </script>
+
+    <script src="/js/vendor/popper.min.js"></script>
+    
+</body>
+
+</html>

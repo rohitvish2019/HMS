@@ -1,0 +1,123 @@
+
+.tr, td, tr, th{
+    text-align: center;
+    border: 1px dotted;
+    border-top: none;
+  }
+
+.bg th{
+    font-size: small;
+    text-align: center !important;
+    vertical-align: middle !important;
+    background-color: #025E73 !important;
+    border-right: 1px dotted black;
+    color: white !important;
+  }
+
+  tr{
+    font-size: 14px;
+  }
+  .bg td{
+    text-align: left;
+    vertical-align: middle !important;
+    font-size: small;
+    font-weight: 500;
+    border-bottom:1px solid black;
+  }
+
+#table-content > .completed-row > * {
+  background-color: #bef5be !important;
+}
+#closeButton{
+  font-size: larger;
+}
+
+#closeButton:hover{
+  font-size: large;
+  cursor: pointer;
+
+}
+.tbody {
+    overflow: auto;
+    
+}
+
+.summary-pill-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #e4e7eb;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  margin-left: 2px;
+}
+
+.summary-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1.2;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.summary-pill-success {
+  background: rgba(40, 167, 69, 0.15);
+  color: #155724;
+  border: 1px solid rgba(40, 167, 69, 0.35);
+}
+
+.summary-pill-warning {
+  background: rgba(255, 193, 7, 0.18);
+  color: #7a5200;
+  border: 1px solid rgba(255, 193, 7, 0.55);
+}
+
+.pill-button {
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+#addPaymentPopup{
+  width: 30%;
+  position: fixed;
+  top: 20%;
+  left: 35%;
+  background-color:#d0d0d0;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 2);
+  overflow-y: auto;
+  margin-top: 4%;
+}
+
+#deliveryDetails{
+  width: 30%;
+  position: fixed;
+  top: 20%;
+  left: 35%;
+  background-color:#d0d0d0;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 2);
+  overflow-y: auto;
+  margin-top: 4%;
+}
+
+#loader{
+  display: flex;
+  justify-content: center;
+  position: fixed;
+  top: 40%;
+  left: 47%;
+  z-index: 10;
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Reciept</title>
+    <link rel="stylesheet" href="/css/birthCertificateTemplate.css">
+    <link rel="stylesheet" href="/css/vendor/fontawesome-5.15.4.min.css">
+</head>
+
+<body style="text-align: center;border: 1px solid black; padding: 0px 10px 10px 10px; ">
+    <div style="text-align: center; margin-bottom: 5px;">
+        <div style="display: flex; border-bottom: 1px dotted black; font-size: small; justify-content: space-between;padding: 5px;">
+            <span style="font-size: medium;"><i>Receipt</i></span>
+            <span>Reg No. NH/9255/JUN-2023</span>
+        </div>
+        <div id="header">
+            <%-include('pdf_header')%>
+            <div style="display: flex; justify-content: space-between;">
+                <%=visit.DischargeBillNumber%>
+            </div>
+            
+        </div>
+    </div>
+    <div class=" content">
+        Received with thanks from <%=visit.Patient.Name%> W/O <%=visit.Patient.Husband%> Rs. <label id="rs"></label> &nbsp;/- <br> ( In words <label id="result"></label> only ) on behalf of IPD no. <%=visit.Patient.IPDNumber%>
+    </div>
+    <div class="content">
+        <span>Course by Cash / QR Code in Part / Full
+            Amount between <%=(new Date(visit.AdmissionDate)).toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'})%> and <%=(new Date(visit.DischargeDate)).toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'})%> <!--Against Bill no <%=visit.DischargeBillNumber%> --></span>
+    </div>
+
+    <div style=" display: flex; font-size: 20px; margin-top: 5%; height: 25px;">
+        <span style="padding:0px 10px 0px 30px;"><b>Rs.</b></span>
+        <textarea rows="1" style="resize: none;" id="amount" onchange="convertToWords(),updaters()"><%=visit.FinalBillAmount + advancePaid%></textarea>
+    </div>
+    <div style="display: flex;justify-content: flex-end; margin-right: 50px;">
+        <span><i>Signature</i></span>
+    </div>
+    <button id="printButton" onclick="printMe()"
+        style="width: 50%;background-color: #198754;border: none;color: white;border-radius: 1.3rem;font-size: medium;padding: 10px;"
+        class="btn btn-success"><i class="fa-solid fa-print"></i> <b>Print</b>
+    </button>
+</body>
+
+<script src="/js/paymentReceiptTemplate.js"></script>
+
+
+</html>

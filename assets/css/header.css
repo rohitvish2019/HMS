@@ -1,0 +1,118 @@
+header{
+  height: 100px;
+  text-align: center;
+  background-color:#343a40!important;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.logo{
+  height: 90px;
+  width: 10%;
+}
+
+ul{
+    list-style: none;
+  }
+
+  .btn:hover{
+    color:lightgrey;
+  }
+
+  .btn{
+    color: white;
+    font-weight: bold;
+    font-size: small;
+  }
+  
+  .menu-items{
+    display: flex;
+  }
+
+  .patient-search-container{
+    position: relative;
+    flex: 0 0 210px;
+    margin-left: .5rem;
+    width: 210px;
+  }
+
+  .patient-search-container .form-control{
+    height: 32px;
+    min-width: 0;
+    font-size: 12px;
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
+  }
+
+  .patient-search-container .btn{
+    height: 32px;
+    padding: 4px 9px;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+  }
+
+  @media (max-width: 1200px){
+    .patient-search-container{
+      flex-basis: 170px;
+      width: 170px;
+    }
+  }
+
+  .search-results{
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1100;
+    box-shadow: 0 0 10px rgba(0,0,0,0.15);
+  }
+
+  .patient-result-item .patient-result-main{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .patient-result-item .patient-result-meta{
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .patient-result-item{
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .patient-search-detail{
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 1200;
+  }
+
+  .patient-search-detail .card-body{
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .dropdown-menu.show{
+    background-color: rgb(235, 238, 238);
+  }
+  li a {
+    font-weight: bold !important;
+    color: rgb(11, 80, 42) !important;
+  }
+
+
+  .doctor-icon {
+    margin-right: 20px;
+  }
+  
